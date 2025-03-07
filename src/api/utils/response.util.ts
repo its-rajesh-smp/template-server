@@ -1,11 +1,13 @@
 import { Response } from "express";
-
-type statusCode = 200 | 201 | 400 | 401 | 404 | 500;
+import { ZodError } from "zod";
+import { ERROR_RESPONSES } from "../constants/error.const";
+import { TStatusCode } from "../types/response.type";
+import { formatZodError } from "./zod.util";
 
 export const sendResponse = (
   res: Response,
   data: any,
-  statusCode?: statusCode
+  statusCode?: TStatusCode
 ) => {
   return res.status(statusCode || 200).json({ data: data }) as any;
 };
@@ -13,7 +15,21 @@ export const sendResponse = (
 export const sendErrorResponse = (
   res: Response,
   error: any,
-  statusCode?: statusCode
+  errorKey?: keyof typeof ERROR_RESPONSES // Only allow predefined errors
 ) => {
-  return res.status(statusCode || 500).json({ error }) as any;
+  if (error instanceof ZodError) {
+    return res.status(400).json({
+      status: "fail",
+      message: ERROR_RESPONSES.VALIDATION_ERROR.message,
+      errors: formatZodError(error),
+    });
+  }
+
+  const errorResponse = ERROR_RESPONSES[errorKey || "SERVER_ERROR"];
+
+  return res.status(errorResponse.status).json({
+    status: "error",
+    message: errorResponse.message,
+    errors: [error?.message || error],
+  }) as any;
 };
